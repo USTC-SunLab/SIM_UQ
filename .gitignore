@@ -1,0 +1,21 @@
+# Training outputs
+ckpts_uq_sup/
+ckpts_uq*/
+
+# Synthetic data
+/data_uq_sup_sim/
+data_uq_sup_sim/
+
+# Cache
+__pycache__/
+*/__pycache__/
+
+# Local artifacts
+prompt.txt
+
+# Python/UV metadata
+pyproject.toml
+uv.lock
+
+# Local python version
+.python-version
