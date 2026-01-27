@@ -94,6 +94,15 @@ def min_max_norm(im):
     if im_max > 0:
         im /= im_max
     return im
+
+
+def min_max_norm_full(im):
+    im = im.astype(np.float32)
+    im_min = float(np.min(im))
+    im_max = float(np.max(im))
+    if im_max <= im_min:
+        return np.zeros_like(im, dtype=np.float32)
+    return (im - im_min) / (im_max - im_min)
 def random_crop_arrays(arrays, h, w):
     # 用来处理sim emitter和lp，由于emitter和lp与sim的形状不同，故需要对齐形状
     scales = [int(x.shape[-1]/arrays[0].shape[-1]) for x in arrays]
@@ -141,12 +150,28 @@ class dataset_2d_sim_supervised(torch.utils.data.Dataset):
             if use_gt:
                 em = imread(gt_paths[index][0]).astype(np.float32)
                 lp = imread(gt_paths[index][1]).astype(np.float32)
-                if self.gt_norm in ("minmax", "minmax_per_channel"):
-                    em = min_max_norm(em)
+                if self.gt_norm in ("minmax", "minmax_per_channel", "minmax_full"):
+                    if self.gt_norm == "minmax_full":
+                        em = min_max_norm_full(em)
+                    else:
+                        em = min_max_norm(em)
+                        if np.max(em) <= 0:
+                            em = min_max_norm_full(em)
+
                     if self.gt_norm == "minmax_per_channel" and lp.ndim == 3:
-                        lp = np.stack([min_max_norm(lp[i]) for i in range(lp.shape[0])], axis=0)
+                        lp_norm = []
+                        for i in range(lp.shape[0]):
+                            li = min_max_norm(lp[i])
+                            if np.max(li) <= 0:
+                                li = min_max_norm_full(lp[i])
+                            lp_norm.append(li)
+                        lp = np.stack(lp_norm, axis=0)
+                    elif self.gt_norm == "minmax_full":
+                        lp = min_max_norm_full(lp)
                     else:
                         lp = min_max_norm(lp)
+                        if np.max(lp) <= 0:
+                            lp = min_max_norm_full(lp)
                 self.emitter_gts.append(em[None])
                 self.lp_gts.append(lp)
     def __len__(self) -> int:

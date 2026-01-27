@@ -112,5 +112,6 @@ uv run python train_data_uq_sup.py \
   --train_glob "./data_uq_sup_sim/train/*.tif" \
   --ckpt_dir "./ckpts_uq_sup" \
   --batch_size 7 --epochs 200 --lr 1e-4 \
-  --uq_targets emitter,lp
+  --uq_targets emitter,lp \
+  --gt_norm minmax_full
 ```

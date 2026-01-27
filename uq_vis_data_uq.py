@@ -429,7 +429,7 @@ def save_debug_artifacts_data_uq_sup(
     # ---- base arrays ----
     inp_9hw = to_chw(x_np)
     lp_pred_9hw = to_chw(lp_np)
-    emitter_pred_hw = to_hw(emitter_np)
+    emitter_pred_hw = vol_to_2d(emitter_np, mode="zmid")
     psf_pred_hw = vol_to_2d(psf_np, mode="zmid")
 
     # ---- save npz (compact) ----
@@ -442,7 +442,7 @@ def save_debug_artifacts_data_uq_sup(
     )
     if gt_pack:
         if "emitter_gt" in gt_pack and gt_pack["emitter_gt"] is not None:
-            arrays_to_save["emitter_gt_hw"] = to_hw(gt_pack["emitter_gt"])
+            arrays_to_save["emitter_gt_hw"] = vol_to_2d(gt_pack["emitter_gt"], mode="zmid")
         if "lp_gt" in gt_pack and gt_pack["lp_gt"] is not None:
             arrays_to_save["lp_gt_9hw"] = to_chw(gt_pack["lp_gt"])
         if "psf_gt" in gt_pack and gt_pack["psf_gt"] is not None:
@@ -473,7 +473,7 @@ def save_debug_artifacts_data_uq_sup(
 
     # emitter pred vs gt
     if gt_pack and gt_pack.get("emitter_gt") is not None:
-        emitter_gt_hw = to_hw(gt_pack["emitter_gt"])
+        emitter_gt_hw = vol_to_2d(gt_pack["emitter_gt"], mode="zmid")
         save_pair_2d(
             os.path.join(out_dir, "emitter_pred_gt.png"),
             emitter_pred_hw,

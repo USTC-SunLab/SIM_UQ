@@ -235,9 +235,9 @@ def parse_args(argv: Optional[List[str]] = None):
     p.add_argument(
         "--gt_norm",
         type=str,
-        default="minmax",
-        choices=["none", "minmax", "minmax_per_channel"],
-        help="normalization for GT emitter/lp (recommended: minmax)",
+        default="minmax_full",
+        choices=["none", "minmax", "minmax_full", "minmax_per_channel"],
+        help="normalization for GT emitter/lp (recommended: minmax_full for sparse emitter)",
     )
 
     # ---- data uncertainty / heteroscedastic ----
