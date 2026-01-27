@@ -1,0 +1,60 @@
+{
+  "debug_path": "/data/repo/SIMFormer/data/SIM-simulation/curve/light_pattern_period/standard/train/0.tif",
+  "crop_record": {
+    "h0": 109,
+    "w0": 126,
+    "h": 80,
+    "w": 80,
+    "ref_shape": [
+      9,
+      256,
+      256
+    ],
+    "scales": [
+      1
+    ]
+  },
+  "rec_vs_input": {
+    "mse": 0.042745500802993774,
+    "mae": 0.13660143315792084,
+    "psnr": 13.691094887922084
+  },
+  "psf_debug": {
+    "tv": 0.0002575713733676821,
+    "center_loss": 0.00030864906148053706,
+    "gauss_prior": 2.3004741933618789e-07,
+    "center_of_mass": {
+      "cy": 24.010608673095703,
+      "cx": 23.98599624633789,
+      "target_y": 24.0,
+      "target_x": 24.0
+    },
+    "shape": [
+      1,
+      1,
+      1,
+      49,
+      49
+    ]
+  },
+  "lp_debug": {
+    "tv": 0.03896011412143707,
+    "shape": [
+      1,
+      1,
+      9,
+      240,
+      240
+    ]
+  },
+  "uncertainty_mc": null,
+  "saved_files": {
+    "sample_npz": "sample.npz",
+    "input_rec_train": "input_rec_train.png",
+    "input_rec_pct": "input_rec_pct.png",
+    "light_pattern": "light_pattern.png",
+    "emitter_psf_gauss": "emitter_psf_gauss.png",
+    "mask_png": "mask.png",
+    "deconv_png": "deconv.png"
+  }
+}
