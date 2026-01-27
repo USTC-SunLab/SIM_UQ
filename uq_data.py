@@ -121,7 +121,8 @@ class dataset_2d_sim_supervised(torch.utils.data.Dataset):
         use_gt: bool = False, # gt_paths 双保险
         gt_paths = None,
         # normalize: bool = True,
-        log_fn = print
+        log_fn = print,
+        gt_norm: str = "none",  # none | minmax | minmax_per_channel
     ):
         super().__init__()
         # accessory
@@ -131,14 +132,23 @@ class dataset_2d_sim_supervised(torch.utils.data.Dataset):
         log_fn(f"num of files: {len(paths)}, first path: {paths[0]}")
         self.use_gt = use_gt
         self.crop_size = crop_size
+        self.gt_norm = str(gt_norm).strip().lower()
 
         self.imgs,self.emitter_gts,self.lp_gts = [],[],[]
         for index in tqdm(range(len(paths)), desc="Indexing dataset"):
             img = min_max_norm(imread(paths[index]).astype(np.float32))
             self.imgs.append(img)
             if use_gt:
-                self.emitter_gts.append(imread(gt_paths[index][0]).astype(np.float32)[None])
-                self.lp_gts.append(imread(gt_paths[index][1]).astype(np.float32))
+                em = imread(gt_paths[index][0]).astype(np.float32)
+                lp = imread(gt_paths[index][1]).astype(np.float32)
+                if self.gt_norm in ("minmax", "minmax_per_channel"):
+                    em = min_max_norm(em)
+                    if self.gt_norm == "minmax_per_channel" and lp.ndim == 3:
+                        lp = np.stack([min_max_norm(lp[i]) for i in range(lp.shape[0])], axis=0)
+                    else:
+                        lp = min_max_norm(lp)
+                self.emitter_gts.append(em[None])
+                self.lp_gts.append(lp)
     def __len__(self) -> int:
         return len(self.imgs)
 

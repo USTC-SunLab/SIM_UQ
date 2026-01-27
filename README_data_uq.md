@@ -57,7 +57,32 @@ uv run python uq_train_data_uq.py \
 - `*_hist.png` 直方图
 - `uq_summary.json` 统计均值与 p95
 - （监督版）`emitter_nll.png`, `lp_nll.png`：基于 GT 的逐像素 NLL 可视化（需要 `train_data_uq_sup.py` 且 GT 可用）
- - 训练日志新增 UQ 校准指标：`emitter_calib_ratio / lp_calib_ratio`（MSE/Var）、`emitter_corr / lp_corr`（Var 与误差的相关系数）
+- 训练日志新增 UQ 校准指标：`emitter_calib_ratio / lp_calib_ratio`（MSE/Var）、`emitter_corr / lp_corr`（Var 与误差的相关系数）
+
+## 监督版可视化（整合对比）
+监督训练的 debug 输出会生成更“成对”的对比图（减少杂乱）：  
+- `input.png`：输入 SIM 9 帧  
+- `emitter_pred_gt.png`：emitter 预测 vs GT  
+- `lp_pred_gt.png`：LP 预测 vs GT  
+- `psf_pred_gt.png`：PSF 预测 vs GT  
+- `uq_vs_noise.png`：预测不确定性（rec_std）vs 合成噪声 sigma（需要使用合成数据）  
+
+## Loss / Metric 曲线
+训练完成后可用脚本画曲线：
+```bash
+uv run python plot_metrics_curves.py --metrics_csv "./ckpts_uq_sup/metrics.csv"
+```
+
+## 校准曲线（Calibration Curves）
+校准曲线用于评估**预测方差是否与真实误差匹配**。  
+按预测方差分箱，比较每个 bin 中的**平均预测方差**与**真实 MSE**，理想曲线接近 y=x。
+
+```bash
+uv run python plot_calibration_curves.py --root "./ckpts_uq_sup/debug_samples"
+```
+
+监督训练时，校准曲线已**自动集成到 debug 可视化**中：  
+`debug_samples/calibration/calib_emitter.png`、`debug_samples/calib_lp.png`
 
 ## 注意事项
 - 该脚本**不修改原 `uq_train.py`**。

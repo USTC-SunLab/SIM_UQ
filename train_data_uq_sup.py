@@ -43,7 +43,7 @@ from uq_data_uq_utils import (
     propagate_rec_variance,
     downsample_variance,
 )
-from uq_vis_data_uq import save_debug_artifacts_data_uq
+from uq_vis_data_uq import save_debug_artifacts_data_uq_sup, save_calibration_curves_from_dir
 
 
 # =============================================================================
@@ -232,6 +232,13 @@ def parse_args(argv: Optional[List[str]] = None):
     p.add_argument("--gt_emitter_suffix", type=str, default="", help="suffix before ext for emitter GT")
     p.add_argument("--gt_lp_suffix", type=str, default="_lp", help="suffix before ext for LP GT")
     p.add_argument("--psf_gt_path", type=str, default="", help="path to PSF GT (required if supervising psf)")
+    p.add_argument(
+        "--gt_norm",
+        type=str,
+        default="minmax",
+        choices=["none", "minmax", "minmax_per_channel"],
+        help="normalization for GT emitter/lp (recommended: minmax)",
+    )
 
     # ---- data uncertainty / heteroscedastic ----
     p.add_argument("--uq_logvar_min", type=float, default=-10.0, help="min clamp for log-variance")
@@ -480,6 +487,18 @@ def _load_psf_gt(path: str) -> np.ndarray:
     return np.asarray(arr, dtype=np.float32)
 
 
+def _guess_meta_path(train_path: str) -> str:
+    base = os.path.basename(train_path)
+    stem, _ = os.path.splitext(base)
+    d = os.path.dirname(train_path)
+    parent = os.path.basename(d)
+    if parent == "train":
+        meta_dir = os.path.join(os.path.dirname(d), "train_meta")
+    else:
+        meta_dir = os.path.join(d, "train_meta")
+    return os.path.join(meta_dir, f"{stem}.npz")
+
+
 # =============================================================================
 # 3) Data-UQ model wrapper (heteroscedastic heads)
 # =============================================================================
@@ -663,6 +682,7 @@ def main():
         crop_size=(args.crop_h, args.crop_w),
         use_gt=need_gt,
         gt_paths=gt_paths,
+        gt_norm=args.gt_norm,
     )
     pin = bool(torch.cuda.is_available())
     train_loader = DataLoader(
@@ -686,6 +706,7 @@ def main():
             crop_size=(args.crop_h, args.crop_w),
             use_gt=need_gt,
             gt_paths=([gt_paths[args.debug_index]] if need_gt else None),
+            gt_norm=args.gt_norm,
         )
         debug_loader = DataLoader(
             debug_ds,
@@ -903,10 +924,18 @@ def main():
                 if float(args.uq_var_reg) > 0:
                     logvar_reg = logvar_reg + jnp.mean(psf_logvar * psf_logvar)
 
-            # ---- regularizers ----
-            psf_tv = TV_Loss(psf)
-            lp_tv = TV_Loss(light_pattern)
-            psf_center = center_loss(psf)
+            # ---- regularizers (only when the target is enabled) ----
+            if use_psf_uq:
+                psf_tv = TV_Loss(psf)
+                psf_center = center_loss(psf)
+            else:
+                psf_tv = jnp.zeros((), dtype=rec.dtype)
+                psf_center = jnp.zeros((), dtype=rec.dtype)
+
+            if use_lp_uq:
+                lp_tv = TV_Loss(light_pattern)
+            else:
+                lp_tv = jnp.zeros((), dtype=rec.dtype)
 
             loss = loss + args.tv_loss * psf_tv + args.psfc_loss * psf_center + args.lp_tv * lp_tv
             loss = loss + float(args.uq_var_reg) * logvar_reg
@@ -1328,7 +1357,48 @@ def main():
                 uq_pack["lp_nll"] = np.array(jax.device_get(lp_nll)).astype(np.float32)
 
             # save artifacts + UQ maps
-            dbg_metrics = save_debug_artifacts_data_uq(
+            # optional: load synthetic noise sigma map for comparison
+            noise_sigma_np = None
+            if debug_path:
+                meta_path = _guess_meta_path(str(debug_path))
+                if os.path.exists(meta_path):
+                    try:
+                        with np.load(meta_path) as z:
+                            if "noise_sigma" in z:
+                                noise_sigma_np = np.asarray(z["noise_sigma"], dtype=np.float32)
+                    except Exception:
+                        noise_sigma_np = None
+
+            # align GT to prediction resolution for visualization
+            gt_em_vis = None
+            gt_lp_vis = None
+            gt_psf_vis = None
+            if gt_em_np is not None:
+                gt_em_t = jnp.asarray(gt_em_np)
+                gt_em_t = _to_b1_5d(gt_em_t)
+                gt_em_t = _downsample_hw_like(gt_em_t, emitter)
+                gt_em_t = _align_like(emitter, gt_em_t)
+                gt_em_vis = np.array(jax.device_get(gt_em_t)).astype(np.float32)
+            if gt_lp_np is not None:
+                gt_lp_t = jnp.asarray(gt_lp_np)
+                gt_lp_t = _to_b1_5d(gt_lp_t)
+                gt_lp_t = _downsample_hw_like(gt_lp_t, lp)
+                gt_lp_t = _align_like(lp, gt_lp_t)
+                gt_lp_vis = np.array(jax.device_get(gt_lp_t)).astype(np.float32)
+            if psf_gt is not None:
+                gt_psf_t = _to_b1_5d(psf_gt)
+                gt_psf_t = _downsample_hw_like(gt_psf_t, psf)
+                gt_psf_t = _align_like(psf, gt_psf_t)
+                gt_psf_vis = np.array(jax.device_get(gt_psf_t)).astype(np.float32)
+
+            gt_pack = {
+                "emitter_gt": gt_em_vis,
+                "lp_gt": gt_lp_vis,
+                "psf_gt": gt_psf_vis,
+            }
+            noise_pack = {"noise_sigma": noise_sigma_np} if noise_sigma_np is not None else None
+
+            dbg_metrics = save_debug_artifacts_data_uq_sup(
                 out_dir=out_dir,
                 args=args,
                 debug_path=str(debug_path),
@@ -1341,7 +1411,14 @@ def main():
                 mask_np=mask_np,
                 deconv_np=deconv_np,
                 uq_pack=uq_pack,
+                gt_pack=gt_pack,
+                noise_pack=noise_pack,
             )
+            # update calibration curves from all supervised debug samples
+            try:
+                save_calibration_curves_from_dir(args.debug_dir, bins=10)
+            except Exception:
+                pass
 
             note = f"debug_sample:{out_dir}"
 
