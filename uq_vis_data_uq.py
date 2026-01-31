@@ -22,7 +22,6 @@ from uq_vis import (
     save_png_single_map_pct,
     save_hist_png,
     psf_mass_2d_np,
-    gaussian_2d_np,
     center_of_mass_np,
     tv_np,
 )
@@ -419,8 +418,6 @@ def save_debug_artifacts_data_uq_sup(
 
     psf_mass = psf_mass_2d_np(psf_np)
     Hpsf, Wpsf = psf_mass.shape
-    gauss = gaussian_2d_np(Hpsf, Wpsf, float(args.psf_sigma))
-    psf_gauss = float(np.mean((psf_mass - gauss) ** 2))
 
     cy, cx = center_of_mass_np(psf_mass)
     ty, tx = (Hpsf - 1) * 0.5, (Wpsf - 1) * 0.5
@@ -538,7 +535,6 @@ def save_debug_artifacts_data_uq_sup(
         "psf_debug": {
             "tv": psf_tv,
             "center_loss": psf_center,
-            "gauss_prior": psf_gauss,
             "center_of_mass": {"cy": cy, "cx": cx, "target_y": ty, "target_x": tx},
             "shape": list(np.asarray(psf_np).shape),
         },
@@ -562,5 +558,4 @@ def save_debug_artifacts_data_uq_sup(
         "lp_tv": lp_tv,
         "psf_tv": psf_tv,
         "psf_center": psf_center,
-        "psf_gauss": psf_gauss,
     }

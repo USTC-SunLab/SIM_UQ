@@ -19,3 +19,14 @@ uv.lock
 
 # Local python version
 .python-version
+*.png
+demo_outputs/
+simple_data_uq/ckpts/
+*.npz
+*.tif
+*.csv
+*.json
+*.jpg
+uq_selfsup/ckpts/
+uq_selfsup/ckpts*/
+log.txt

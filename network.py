@@ -96,7 +96,7 @@ class ViT_CNN(nn.Module):
         f = x.reshape((x.shape[0], d, h, w, -1))
         return f
 
-    def __call__(self, x, args, training, mask_ratio):
+    def __call__(self, x, args, training, mask_ratio, return_features: bool = False):
         # batch, C, Z, Y, X
         img_t = x.transpose([0, 2, 3, 4, 1])
         # ViT encoder
@@ -115,21 +115,23 @@ class ViT_CNN(nn.Module):
         mask = self.MAE.unpatchify(mask)
         mask = mask.transpose([0, 4, 1, 2, 3])
 
-        f = self.unpatchify_feature(Features)
+        feat_em = self.unpatchify_feature(Features)
         # emitter
-        emitter = self.emitter_decoder(f).transpose([0, 4, 1, 2, 3])
+        emitter = self.emitter_decoder(feat_em).transpose([0, 4, 1, 2, 3])
         # background
-        bg = self.bg_decoder(f)
+        bg = self.bg_decoder(feat_em)
         bg = jax.nn.softplus(bg)
         bg = nn.avg_pool(bg, tuple([self.patch_size[0], self.patch_size[1]*4, self.patch_size[2]*4]), padding="SAME")
         bg = bg.transpose([0, 4, 1, 2, 3])
 
         F = self.lorm(Features)
-        f = self.unpatchify_feature(F)
+        feat_lp = self.unpatchify_feature(F)
 
         
-        light_pattern = self.lf_decoder(f).transpose([0, 4, 1, 2, 3])
+        light_pattern = self.lf_decoder(feat_lp).transpose([0, 4, 1, 2, 3])
 
+        if return_features:
+            return emitter, bg, light_pattern, mask, feat_em
         return emitter, bg, light_pattern, mask
 
 
@@ -148,7 +150,7 @@ class PiMAE(nn.Module):
         self.PSF_predictor = FCN(1)
 
         
-    def __call__(self, x_clean, args, training):
+    def __call__(self, x_clean, args, training, return_features: bool = False):
         rng = self.make_rng("random_masking")
         rng_noise_1, rng_noise_2, rng_noise_3 = jax.random.split(rng, 3)
 
@@ -162,7 +164,12 @@ class PiMAE(nn.Module):
                             * jax.random.uniform(rng_noise_2, (x.shape[0], 1, 1, 1, 1), minval=0.0, maxval=args.add_noise))
             x = x + noise
         
-        emitter, bg, light_pattern, mask = self.pt_predictor(x, args, training, args.mask_ratio)
+        if return_features:
+            emitter, bg, light_pattern, mask, feat_em = self.pt_predictor(
+                x, args, training, args.mask_ratio, return_features=True
+            )
+        else:
+            emitter, bg, light_pattern, mask = self.pt_predictor(x, args, training, args.mask_ratio)
         emitter = jax.nn.softplus(emitter)
         
         light_pattern = jax.nn.softmax(light_pattern, axis=2) * light_pattern.shape[2]
@@ -191,6 +198,8 @@ class PiMAE(nn.Module):
                             (1, args.rescale[0], args.rescale[1]), 
                             padding="VALID").transpose([0, 4, 1, 2, 3])
         print(rec_real.shape,light_pattern.shape,psf.shape)
+        if return_features:
+            return (rec_real,light_pattern,emitter,psf,mask_real,S,feat_em)
         return (rec_real,light_pattern,emitter,psf,mask_real,S)
         # (rec, light_pattern, emitter, psf, , deconv)
         return {
